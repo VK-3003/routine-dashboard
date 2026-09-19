@@ -30,7 +30,12 @@ npx wrangler secret put API_KEY
 ## Secrets GitHub nécessaires (Settings → Secrets and variables → Actions)
 
 - `VITE_WORKER_URL` — l'URL du Worker déployé
-- `VITE_API_KEY` — même valeur que le secret `API_KEY` du Worker
+
+**Pas de `VITE_API_KEY` ici** : la clé n'est jamais dans le build. Elle
+est demandée à l'ouverture de la page et stockée uniquement dans le
+`localStorage` du navigateur qui l'a saisie — invisible dans le code
+source, dans le repo, ou dans les outils dev d'un visiteur qui ne l'a
+jamais entrée.
 
 Le repo `routine-bot` (privé) contient la documentation complète du
 projet et son historique de décisions.

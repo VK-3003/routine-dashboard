@@ -35,7 +35,6 @@ jobs:
         working-directory: web
         env:
           VITE_WORKER_URL: ${{ secrets.VITE_WORKER_URL }}
-          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
         run: npm run build
 
       - uses: actions/configure-pages@v5
