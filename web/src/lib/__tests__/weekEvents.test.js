@@ -4,7 +4,7 @@ import {
   frenchToJsDay,
   isWeekRelevant,
   occurrenceDays,
-  buildEvents,
+  groupEventsByDay,
 } from "../weekEvents.js";
 import { JOURS_SEMAINE } from "../domaines.js";
 
@@ -64,20 +64,22 @@ describe("occurrenceDays", () => {
   });
 });
 
-describe("buildEvents", () => {
+describe("groupEventsByDay", () => {
   // A Monday-first week: index 0 = Monday 2026-09-14 .. index 6 = Sunday 2026-09-20.
   const weekDates = Array.from({ length: 7 }, (_, i) => new Date(Date.UTC(2026, 8, 14 + i)));
 
-  it("places a timed daily routine on every day at the right time", () => {
+  it("places a timed daily routine in the timed bucket on every day", () => {
     const routine = { id: "r1", nom: "Test", heure: "09:15", frequence: "Quotidien", domaine: "Sport" };
-    const events = buildEvents([routine], weekDates);
+    const days = groupEventsByDay([routine], weekDates);
 
-    expect(events).toHaveLength(7);
-    expect(events[0].start).toBe("2026-09-14T09:15:00");
-    expect(events[0].allDay).toBe(false);
+    expect(days).toHaveLength(7);
+    for (const day of days) {
+      expect(day.timed.map((r) => r.id)).toEqual(["r1"]);
+      expect(day.allDay).toEqual([]);
+    }
   });
 
-  it("places a Nx/semaine routine only on its assigned days", () => {
+  it("places a Nx/semaine routine in the all-day bucket only on its assigned days", () => {
     const routine = {
       id: "r2",
       nom: "Test 2x",
@@ -86,16 +88,23 @@ describe("buildEvents", () => {
       jours: ["Mardi", "Vendredi"],
       domaine: "Kiné",
     };
-    const events = buildEvents([routine], weekDates);
+    const days = groupEventsByDay([routine], weekDates);
 
-    expect(events).toHaveLength(2);
-    expect(events[0].allDay).toBe(true);
-    expect(events[0].start).toBe("2026-09-15"); // Tuesday
-    expect(events[1].start).toBe("2026-09-18"); // Friday
+    expect(days[0].allDay).toEqual([]); // Monday: not assigned
+    expect(days[1].allDay.map((r) => r.id)).toEqual(["r2"]); // Tuesday
+    expect(days[4].allDay.map((r) => r.id)).toEqual(["r2"]); // Friday
   });
 
   it("excludes plain daily routines with no time entirely", () => {
     const routine = { id: "r3", nom: "Boire de l'eau", heure: null, frequence: "Quotidien", jours: [] };
-    expect(buildEvents([routine], weekDates)).toHaveLength(0);
+    const days = groupEventsByDay([routine], weekDates);
+    expect(days.every((d) => d.allDay.length === 0 && d.timed.length === 0)).toBe(true);
+  });
+
+  it("works for a single-day array (mobile day view)", () => {
+    const routine = { id: "r4", nom: "Test", heure: "07:00", frequence: "Quotidien", domaine: "Art" };
+    const days = groupEventsByDay([routine], [weekDates[2]]);
+    expect(days).toHaveLength(1);
+    expect(days[0].timed.map((r) => r.id)).toEqual(["r4"]);
   });
 });

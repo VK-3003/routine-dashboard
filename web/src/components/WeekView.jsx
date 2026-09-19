@@ -1,58 +1,53 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import FullCalendar from "@fullcalendar/react";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin, { Draggable } from "@fullcalendar/interaction";
+import { useEffect, useMemo, useState } from "react";
+import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { fetchRoutines, reschedule } from "../lib/api.js";
-import { buildEvents, occurrenceDays, isWeekRelevant, jsDayToFrench } from "../lib/weekEvents.js";
-import { domaineColor } from "../lib/domaines.js";
+import { occurrenceDays, isWeekRelevant, groupEventsByDay, jsDayToFrench } from "../lib/weekEvents.js";
+import { yToTime } from "../lib/planningLayout.js";
+import { useIsNarrow } from "../lib/useIsNarrow.js";
+import PlanningGrid from "./planning/PlanningGrid.jsx";
+import BacklogItem from "./planning/BacklogItem.jsx";
 import Toast from "./Toast.jsx";
 
 function mondayOf(date) {
   const d = new Date(date);
-  const diff = (d.getDay() + 6) % 7; // days since Monday
+  const diff = (d.getDay() + 6) % 7;
   d.setDate(d.getDate() - diff);
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
-function weekDatesFrom(monday) {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
+function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
 }
 
 export default function WeekView() {
+  const isNarrow = useIsNarrow();
   const [routines, setRoutines] = useState([]);
-  const [weekStart, setWeekStart] = useState(mondayOf(new Date()));
+  const [anchor, setAnchor] = useState(() => new Date());
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
-  const backlogRef = useRef(null);
 
   useEffect(() => {
     fetchRoutines().then(setRoutines).catch((e) => setError(e.message));
   }, []);
 
-  useEffect(() => {
-    if (!backlogRef.current) return;
-    const draggable = new Draggable(backlogRef.current, {
-      itemSelector: ".backlog-item",
-      eventData: (el) => ({
-        title: el.dataset.nom,
-        extendedProps: { routineId: el.dataset.id },
-        backgroundColor: el.dataset.color,
-        borderColor: el.dataset.color,
-      }),
-    });
-    return () => draggable.destroy();
-  }, [routines]);
+  const dates = useMemo(() => {
+    if (isNarrow) return [new Date(anchor)];
+    const monday = mondayOf(anchor);
+    return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  }, [anchor, isNarrow]);
 
-  const weekDates = useMemo(() => weekDatesFrom(weekStart), [weekStart]);
-  const events = useMemo(() => buildEvents(routines, weekDates), [routines, weekDates]);
+  const eventsByDay = useMemo(() => groupEventsByDay(routines, dates), [routines, dates]);
   const backlog = useMemo(
     () => routines.filter((r) => isWeekRelevant(r) && occurrenceDays(r).length === 0),
     [routines]
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } })
   );
 
   function applyChange(routineId, patch) {
@@ -60,102 +55,106 @@ export default function WeekView() {
     setRoutines((prev) => prev.map((r) => (r.id === routineId ? { ...r, ...patch } : r)));
   }
 
-  function handleEventDrop(info) {
-    const routineId = info.event.extendedProps.routineId;
+  function handleDragEnd(event) {
+    const { active, over } = event;
+    if (!over) return;
+
+    const [zone, dayIndexStr] = over.id.split(":");
+    const dayIndex = Number(dayIndexStr);
+    const targetDay = jsDayToFrench(dates[dayIndex].getDay());
+    const routineId = active.data.current.routineId;
     const routine = routines.find((r) => r.id === routineId);
     if (!routine) return;
 
+    const isDailyAlarm = routine.frequence === "Quotidien" || !routine.frequence;
     const previous = { heure: routine.heure, jours: routine.jours };
-    const newDate = info.event.start;
-    const newHeure = info.event.allDay
-      ? null
-      : `${String(newDate.getHours()).padStart(2, "0")}:${String(newDate.getMinutes()).padStart(2, "0")}`;
 
-    if (routine.frequence === "Quotidien" || !routine.frequence) {
-      // Applies every day - only the time can meaningfully change.
-      applyChange(routineId, { heure: newHeure });
+    if (zone === "allday") {
+      if (isDailyAlarm) {
+        setToast({ message: `"${routine.nom}" est quotidienne, elle ne peut pas passer en "sans heure".` });
+        return;
+      }
+      const jours = [...new Set([...(routine.jours ?? []).filter((d) => d !== targetDay), targetDay])];
+      applyChange(routineId, { jours, heure: null });
       setToast({
-        message: `"${routine.nom}" est quotidienne : seule l'heure a changé, le jour n'a pas d'effet.`,
+        message: `"${routine.nom}" déplacée à ${targetDay}, sans heure.`,
         actionLabel: "Annuler",
         onAction: () => applyChange(routineId, previous),
       });
       return;
     }
 
-    // Nx/semaine or Hebdo: moving to a new day swaps that one day in Jours.
-    const oldDay = jsDayToFrench(info.oldEvent.start.getDay());
-    const newDay = jsDayToFrench(newDate.getDay());
-    const jours = (routine.jours ?? []).filter((d) => d !== oldDay);
-    if (!jours.includes(newDay)) jours.push(newDay);
+    // zone === "timed"
+    const overRect = over.rect;
+    const activeRect = active.rect.current.translated;
+    const newHeure = yToTime(activeRect.top - overRect.top);
 
+    if (isDailyAlarm) {
+      applyChange(routineId, { heure: newHeure });
+      setToast({
+        message: `"${routine.nom}" est quotidienne : seule l'heure a changé (${newHeure}).`,
+        actionLabel: "Annuler",
+        onAction: () => applyChange(routineId, previous),
+      });
+      return;
+    }
+
+    const jours = [...new Set([...(routine.jours ?? []).filter((d) => d !== targetDay), targetDay])];
     applyChange(routineId, { jours, heure: newHeure });
     setToast({
-      message: `"${routine.nom}" déplacée à ${newDay}.`,
+      message: `"${routine.nom}" déplacée à ${targetDay} ${newHeure}.`,
       actionLabel: "Annuler",
       onAction: () => applyChange(routineId, previous),
     });
   }
 
-  function handleExternalDrop(info) {
-    const routineId = info.draggedEl.dataset.id;
-    const routine = routines.find((r) => r.id === routineId);
-    if (!routine) return;
+  const rangeLabel = isNarrow
+    ? dates[0].toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+    : `${dates[0].toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} – ${dates[6].toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`;
 
-    const previous = { jours: routine.jours };
-    const newDay = jsDayToFrench(info.date.getDay());
-    const jours = [...new Set([...(routine.jours ?? []), newDay])];
-
-    applyChange(routineId, { jours });
-    setToast({
-      message: `"${routine.nom}" ajoutée à ${newDay}.`,
-      actionLabel: "Annuler",
-      onAction: () => applyChange(routineId, previous),
-    });
-  }
+  const step = isNarrow ? 1 : 7;
 
   return (
-    <div className="flex gap-4 p-4 max-w-6xl mx-auto">
-      <aside className="w-56 shrink-0">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-ink-faint mb-2">À placer</h2>
-        <div ref={backlogRef} className="space-y-1">
-          {backlog.map((routine) => (
-            <div
-              key={routine.id}
-              className="backlog-item rounded-lg px-2 py-1.5 text-sm cursor-grab bg-panel hover:bg-panel-hover text-ink"
-              data-id={routine.id}
-              data-nom={routine.nom}
-              data-color={domaineColor(routine.domaine)}
-            >
-              {routine.nom}
-              <span className="block text-xs text-ink-faint">{routine.frequence}</span>
-            </div>
-          ))}
-          {backlog.length === 0 && <p className="text-xs text-ink-faint">Rien à placer.</p>}
-        </div>
-      </aside>
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <div className="max-w-6xl mx-auto p-4 space-y-3">
+        {backlog.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {backlog.map((routine) => (
+              <BacklogItem key={routine.id} routine={routine} />
+            ))}
+          </div>
+        )}
 
-      <div className="flex-1">
-        {error && <p className="text-red-400 text-sm mb-2">Erreur : {error}</p>}
-        <FullCalendar
-          plugins={[timeGridPlugin, interactionPlugin]}
-          initialView="timeGridWeek"
-          firstDay={1}
-          locale="fr"
-          headerToolbar={{ left: "prev,next today", center: "title", right: "" }}
-          allDaySlot={true}
-          allDayText="Sans heure"
-          events={events}
-          editable={true}
-          droppable={true}
-          eventDrop={handleEventDrop}
-          drop={handleExternalDrop}
-          eventReceive={(info) => info.event.remove() /* handled via drop + reschedule, avoid dup */}
-          datesSet={(arg) => setWeekStart(mondayOf(arg.start))}
-          height="auto"
-        />
+        <div className="flex items-center justify-between">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setAnchor((d) => addDays(d, -step))}
+              className="px-2.5 py-1 rounded-lg text-sm bg-panel hover:bg-panel-hover text-ink"
+            >
+              ‹
+            </button>
+            <button
+              onClick={() => setAnchor(new Date())}
+              className="px-2.5 py-1 rounded-lg text-sm bg-panel hover:bg-panel-hover text-ink"
+            >
+              Aujourd'hui
+            </button>
+            <button
+              onClick={() => setAnchor((d) => addDays(d, step))}
+              className="px-2.5 py-1 rounded-lg text-sm bg-panel hover:bg-panel-hover text-ink"
+            >
+              ›
+            </button>
+          </div>
+          <p className="text-sm text-ink-muted capitalize">{rangeLabel}</p>
+        </div>
+
+        {error && <p className="text-red-400 text-sm">Erreur : {error}</p>}
+
+        <PlanningGrid dates={dates} eventsByDay={eventsByDay} />
       </div>
 
       {toast && <Toast {...toast} onDismiss={() => setToast(null)} />}
-    </div>
+    </DndContext>
   );
 }
