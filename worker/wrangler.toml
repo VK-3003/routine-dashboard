@@ -4,3 +4,7 @@ compatibility_date = "2026-01-01"
 
 # Secrets (NOTION_TOKEN, API_KEY) are set via `wrangler secret put <NAME>`,
 # never committed here.
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "e78c7c959f2f40c595dd2ca3f0e5a341"

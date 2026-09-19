@@ -1,15 +1,19 @@
 // Cloudflare Worker: the only piece of the project allowed to write to Notion
 // from the dashboard. Holds NOTION_TOKEN server-side, never exposed to the browser.
-// Three routes: GET /api/routines (read), POST /api/reschedule, POST /api/checkin.
-// Protected by a shared API key (X-Api-Key header) - a deterrent, not real auth;
-// acceptable for a single-user personal tool behind an unlisted URL.
+// Routes: GET /api/routines, GET /api/checkins?date=, POST /api/reschedule, POST /api/checkin.
+// Protected by a shared API key (X-Api-Key header, entered once client-side and
+// kept only in the visitor's localStorage - never shipped in the built JS) plus
+// a per-IP rate limit backed by KV. Reasonable for a single-user personal tool,
+// not enterprise-grade auth.
 
 const NOTION_VERSION = "2022-06-28";
 const ROUTINES_DB_ID = "5e91ce77595444dbbc35a4ca68310587";
 const SUIVI_ROUTINES_DB_ID = "56ed3a43b14745f0af30afea117c962f";
+const ALLOWED_ORIGIN = "https://vk-3003.github.io";
+const RATE_LIMIT_PER_MINUTE = 60;
 
 function withCors(response) {
-  response.headers.set("Access-Control-Allow-Origin", "*");
+  response.headers.set("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
   response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   response.headers.set("Access-Control-Allow-Headers", "Content-Type, X-Api-Key");
   return response;
@@ -34,6 +38,25 @@ function notionHeaders(env) {
 
 function isAuthorized(request, env) {
   return request.headers.get("X-Api-Key") === env.API_KEY;
+}
+
+// Fixed-window per-IP counter in KV. Fails open (allows the request) if KV
+// itself errors out - rate limiting is defense-in-depth, not the primary
+// safeguard, so an infra hiccup shouldn't lock the real user out.
+async function isRateLimited(request, env) {
+  try {
+    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const minuteBucket = Math.floor(Date.now() / 60000);
+    const key = `rl:${ip}:${minuteBucket}`;
+
+    const current = parseInt((await env.RATE_LIMIT.get(key)) ?? "0", 10);
+    if (current >= RATE_LIMIT_PER_MINUTE) return true;
+
+    await env.RATE_LIMIT.put(key, String(current + 1), { expirationTtl: 90 });
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 function richText(text) {
@@ -145,6 +168,7 @@ export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return withCors(new Response(null, { status: 204 }));
     if (!isAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
+    if (await isRateLimited(request, env)) return json({ error: "rate limited" }, 429);
 
     const url = new URL(request.url);
     if (url.pathname === "/api/routines" && request.method === "GET") return handleRoutines(env);
