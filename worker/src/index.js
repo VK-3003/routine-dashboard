@@ -9,6 +9,8 @@
 const NOTION_VERSION = "2022-06-28";
 const ROUTINES_DB_ID = "5e91ce77595444dbbc35a4ca68310587";
 const SUIVI_ROUTINES_DB_ID = "56ed3a43b14745f0af30afea117c962f";
+const SUIVI_DB_ID = "27858c6c14fb4ec1845dd9b5cf94d534";
+const STATS_WINDOW_DAYS = 30;
 const ALLOWED_ORIGIN = "https://vk-3003.github.io";
 const RATE_LIMIT_PER_MINUTE = 60;
 
@@ -164,6 +166,121 @@ async function handleCheckin(request, env) {
   return json(data, res.status);
 }
 
+async function queryAllPages(databaseId, filter, env) {
+  const results = [];
+  let cursor;
+  do {
+    const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
+      method: "POST",
+      headers: notionHeaders(env),
+      body: JSON.stringify({ filter, page_size: 100, start_cursor: cursor }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw data;
+    results.push(...data.results);
+    cursor = data.has_more ? data.next_cursor : undefined;
+  } while (cursor);
+  return results;
+}
+
+function isoDaysAgo(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+function completionRatio(entries) {
+  if (!entries.length) return null;
+  const done = entries.filter((e) => e.fait).length;
+  return done / entries.length;
+}
+
+/**
+ * Aggregates Suivi routines + Suivi quotidien into stats, computed on demand
+ * (not a static file) so no personal data ever needs to live in the public
+ * repo - the same privacy boundary as every other route here.
+ */
+async function handleStats(env) {
+  const today = new Date();
+  const startStr = isoDaysAgo(today, STATS_WINDOW_DAYS);
+  const dateFilter = { property: "Date", date: { on_or_after: startStr } };
+
+  let checkinPages, metricPages, routinePages;
+  try {
+    [checkinPages, metricPages, routinePages] = await Promise.all([
+      queryAllPages(SUIVI_ROUTINES_DB_ID, dateFilter, env),
+      queryAllPages(SUIVI_DB_ID, dateFilter, env),
+      // No Actif filter: a routine paused after being tracked should keep
+      // its name in historical stats instead of showing up as "(inconnue)".
+      queryAllPages(ROUTINES_DB_ID, undefined, env),
+    ]);
+  } catch (error) {
+    return json({ error }, 502);
+  }
+
+  const namesById = {};
+  const domaineById = {};
+  for (const page of routinePages) {
+    const p = page.properties;
+    namesById[page.id] = p.Nom?.title?.[0]?.plain_text ?? "(sans nom)";
+    domaineById[page.id] = p.Domaine?.select?.name ?? null;
+  }
+
+  const byRoutine = {};
+  for (const page of checkinPages) {
+    const rel = page.properties.Routine?.relation;
+    const date = page.properties.Date?.date?.start;
+    if (!rel?.length || !date) continue;
+    const routineId = rel[0].id;
+    const fait = page.properties.Fait?.checkbox ?? false;
+    (byRoutine[routineId] ??= {})[date] = fait;
+  }
+
+  const todayStr = today.toISOString().slice(0, 10);
+  const last7Start = isoDaysAgo(today, 7);
+
+  const routines = Object.entries(byRoutine).map(([routineId, byDate]) => {
+    const entries = Object.entries(byDate)
+      .map(([date, fait]) => ({ date, fait }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    let streak = 0;
+    const cursor = new Date(today);
+    if (!(todayStr in byDate)) cursor.setDate(cursor.getDate() - 1);
+    for (;;) {
+      const d = cursor.toISOString().slice(0, 10);
+      if (byDate[d] !== true) break;
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+
+    return {
+      id: routineId,
+      nom: namesById[routineId] ?? "(inconnue)",
+      domaine: domaineById[routineId] ?? null,
+      completion_7d: completionRatio(entries.filter((e) => e.date >= last7Start)),
+      completion_30d: completionRatio(entries),
+      streak,
+      entries,
+    };
+  });
+
+  const metrics = metricPages
+    .map((page) => {
+      const p = page.properties;
+      return {
+        date: p.Date?.date?.start,
+        sommeil: p["Sommeil (h)"]?.number ?? null,
+        energie: p["Énergie"]?.number ?? null,
+        stress: p["Stress"]?.number ?? null,
+      };
+    })
+    .filter((m) => m.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return json({ routines, metrics });
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return withCors(new Response(null, { status: 204 }));
@@ -173,6 +290,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/api/routines" && request.method === "GET") return handleRoutines(env);
     if (url.pathname === "/api/checkins" && request.method === "GET") return handleCheckinsForDate(request, env);
+    if (url.pathname === "/api/stats" && request.method === "GET") return handleStats(env);
     if (url.pathname === "/api/reschedule" && request.method === "POST") return handleReschedule(request, env);
     if (url.pathname === "/api/checkin" && request.method === "POST") return handleCheckin(request, env);
 
