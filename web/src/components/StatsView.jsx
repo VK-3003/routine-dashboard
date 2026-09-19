@@ -1,6 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fetchStats } from "../lib/api.js";
 import StatBar from "./StatBar.jsx";
+
+const PERIODS = [
+  { id: "7", label: "7 jours", days: 7 },
+  { id: "30", label: "30 jours", days: 30 },
+];
 
 function average(values) {
   const present = values.filter((v) => v != null);
@@ -19,25 +24,80 @@ function MetricCard({ label, value, unit }) {
   );
 }
 
+function Chip({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
+        active ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80 bg-white/[0.03]"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function StatsView() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [periodId, setPeriodId] = useState("30");
+  const [domaine, setDomaine] = useState(null);
 
   useEffect(() => {
     fetchStats().then(setData).catch((e) => setError(e.message));
   }, []);
 
+  const periodDays = PERIODS.find((p) => p.id === periodId).days;
+
+  const domaines = useMemo(() => {
+    if (!data) return [];
+    return [...new Set(data.routines.map((r) => r.domaine).filter(Boolean))].sort();
+  }, [data]);
+
+  const routines = useMemo(() => {
+    if (!data) return [];
+    const filtered = domaine ? data.routines.filter((r) => r.domaine === domaine) : data.routines;
+    const completionKey = periodId === "7" ? "completion_7d" : "completion_30d";
+    return [...filtered].sort((a, b) => (b[completionKey] ?? 0) - (a[completionKey] ?? 0));
+  }, [data, domaine, periodId]);
+
+  const metrics = useMemo(() => {
+    if (!data) return [];
+    return data.metrics.slice(-periodDays);
+  }, [data, periodDays]);
+
   if (error) return <p className="text-red-400 p-4">Erreur : {error}</p>;
   if (!data) return <p className="text-white/50 p-4">Chargement...</p>;
 
-  const routines = [...data.routines].sort((a, b) => (b.completion_30d ?? 0) - (a.completion_30d ?? 0));
-  const sommeil = average(data.metrics.map((m) => m.sommeil));
-  const energie = average(data.metrics.map((m) => m.energie));
-  const stress = average(data.metrics.map((m) => m.stress));
+  const sommeil = average(metrics.map((m) => m.sommeil));
+  const energie = average(metrics.map((m) => m.energie));
+  const stress = average(metrics.map((m) => m.stress));
 
   return (
-    <div className="max-w-xl mx-auto p-4 space-y-6">
-      <h1 className="text-xl font-semibold text-white/90">Stats (30 derniers jours)</h1>
+    <div className="max-w-xl mx-auto p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-white/90">Stats</h1>
+        <div className="flex gap-1">
+          {PERIODS.map((p) => (
+            <Chip key={p.id} active={periodId === p.id} onClick={() => setPeriodId(p.id)}>
+              {p.label}
+            </Chip>
+          ))}
+        </div>
+      </div>
+
+      {domaines.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          <Chip active={domaine === null} onClick={() => setDomaine(null)}>
+            Tous
+          </Chip>
+          {domaines.map((d) => (
+            <Chip key={d} active={domaine === d} onClick={() => setDomaine(d)}>
+              {d}
+            </Chip>
+          ))}
+        </div>
+      )}
 
       <div className="flex gap-3">
         <MetricCard label="Sommeil moyen" value={sommeil} unit="h" />
@@ -47,9 +107,9 @@ export default function StatsView() {
 
       <div className="rounded-xl bg-white/[0.03] px-4 py-2 divide-y divide-white/5">
         {routines.map((routine) => (
-          <StatBar key={routine.id} routine={routine} />
+          <StatBar key={routine.id} routine={routine} periodDays={periodDays} />
         ))}
-        {routines.length === 0 && <p className="text-white/50 py-4">Pas encore d'historique.</p>}
+        {routines.length === 0 && <p className="text-white/50 py-4">Rien pour ce filtre.</p>}
       </div>
     </div>
   );
