@@ -1,11 +1,12 @@
 import { useDroppable } from "@dnd-kit/core";
 import EventBlock from "./EventBlock.jsx";
 import AllDayChip from "./AllDayChip.jsx";
-import { HOUR_MARKS, HOUR_HEIGHT, timeToY, totalGridHeight } from "../../lib/planningLayout.js";
+import { HOUR_MARKS, timeToY, totalGridHeight, layoutOverlaps } from "../../lib/planningLayout.js";
 
-export default function DayColumn({ dayIndex, date, isToday, allDayItems, timedItems }) {
+export default function DayColumn({ dayIndex, date, isToday, allDayItems, timedItems, hourHeight }) {
   const allDayDrop = useDroppable({ id: `allday:${dayIndex}` });
   const timedDrop = useDroppable({ id: `timed:${dayIndex}` });
+  const laidOut = layoutOverlaps(timedItems);
 
   return (
     <div className="flex-1 min-w-0 border-l border-line first:border-l-0">
@@ -28,18 +29,24 @@ export default function DayColumn({ dayIndex, date, isToday, allDayItems, timedI
       <div
         ref={timedDrop.setNodeRef}
         className={`relative transition-colors ${timedDrop.isOver ? "bg-chip-active" : ""}`}
-        style={{ height: totalGridHeight() }}
+        style={{ height: totalGridHeight(hourHeight) }}
       >
         {HOUR_MARKS.map((h) => (
-          <div key={h} className="absolute left-0 right-0 border-t border-line" style={{ top: (h - HOUR_MARKS[0]) * HOUR_HEIGHT }} />
+          <div
+            key={h}
+            className="absolute left-0 right-0 border-t border-line"
+            style={{ top: (h - HOUR_MARKS[0]) * hourHeight }}
+          />
         ))}
-        {timedItems.map((routine) => (
+        {laidOut.map(({ event: routine, leftPct, widthPct }) => (
           <EventBlock
             key={routine.id}
             routine={routine}
             dayIndex={dayIndex}
-            top={timeToY(routine.heure)}
-            height={((routine.duree ?? 30) / 60) * HOUR_HEIGHT}
+            top={timeToY(routine.heure, hourHeight)}
+            height={((routine.duree ?? 30) / 60) * hourHeight}
+            leftPct={leftPct}
+            widthPct={widthPct}
           />
         ))}
       </div>

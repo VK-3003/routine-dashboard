@@ -2,7 +2,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { domaineColor } from "../../lib/domaines.js";
 
-export default function EventBlock({ routine, dayIndex, top, height }) {
+export default function EventBlock({ routine, dayIndex, top, height, leftPct = 0, widthPct = 100 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `event:${routine.id}:${dayIndex}`,
     data: { kind: "event", routineId: routine.id, dayIndex },
@@ -19,8 +19,8 @@ export default function EventBlock({ routine, dayIndex, top, height }) {
         position: "absolute",
         top,
         height: Math.max(height, 22),
-        left: 2,
-        right: 2,
+        left: `calc(${leftPct}% + 2px)`,
+        width: `calc(${widthPct}% - 4px)`,
         backgroundColor: `${color}26`,
         borderLeft: `3px solid ${color}`,
         transform: CSS.Translate.toString(transform),

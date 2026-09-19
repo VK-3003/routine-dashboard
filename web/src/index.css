@@ -40,3 +40,26 @@ body {
   background-color: var(--color-surface);
   color: var(--color-ink);
 }
+
+/* Scrollbar matching the theme instead of the OS default (Firefox + WebKit/Chromium/Edge). */
+.scroll-themed {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-panel-hover) transparent;
+}
+
+.scroll-themed::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scroll-themed::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-themed::-webkit-scrollbar-thumb {
+  background-color: var(--color-panel-hover);
+  border-radius: 9999px;
+}
+
+.scroll-themed::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-chip-active);
+}

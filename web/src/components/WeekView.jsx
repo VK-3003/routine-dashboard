@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { fetchRoutines, reschedule } from "../lib/api.js";
 import { occurrenceDays, isWeekRelevant, groupEventsByDay, jsDayToFrench } from "../lib/weekEvents.js";
-import { yToTime } from "../lib/planningLayout.js";
+import { yToTime, ZOOM_LEVELS, BASE_HOUR_HEIGHT } from "../lib/planningLayout.js";
 import { useIsNarrow } from "../lib/useIsNarrow.js";
 import PlanningGrid from "./planning/PlanningGrid.jsx";
 import BacklogItem from "./planning/BacklogItem.jsx";
@@ -28,6 +28,8 @@ export default function WeekView() {
   const [anchor, setAnchor] = useState(() => new Date());
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
+  const [zoomIndex, setZoomIndex] = useState(1); // ZOOM_LEVELS[1] === 1x
+  const hourHeight = BASE_HOUR_HEIGHT * ZOOM_LEVELS[zoomIndex];
 
   useEffect(() => {
     fetchRoutines().then(setRoutines).catch((e) => setError(e.message));
@@ -87,7 +89,7 @@ export default function WeekView() {
     // zone === "timed"
     const overRect = over.rect;
     const activeRect = active.rect.current.translated;
-    const newHeure = yToTime(activeRect.top - overRect.top);
+    const newHeure = yToTime(activeRect.top - overRect.top, hourHeight);
 
     if (isDailyAlarm) {
       applyChange(routineId, { heure: newHeure });
@@ -146,12 +148,32 @@ export default function WeekView() {
               ›
             </button>
           </div>
-          <p className="text-sm text-ink-muted capitalize">{rangeLabel}</p>
+          <p className="text-sm text-ink-muted capitalize hidden sm:block">{rangeLabel}</p>
+
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => setZoomIndex((i) => Math.max(i - 1, 0))}
+              disabled={zoomIndex === 0}
+              className="px-2 py-1 rounded-lg text-sm bg-panel hover:bg-panel-hover text-ink disabled:opacity-30"
+              title="Dézoomer"
+            >
+              −
+            </button>
+            <button
+              onClick={() => setZoomIndex((i) => Math.min(i + 1, ZOOM_LEVELS.length - 1))}
+              disabled={zoomIndex === ZOOM_LEVELS.length - 1}
+              className="px-2 py-1 rounded-lg text-sm bg-panel hover:bg-panel-hover text-ink disabled:opacity-30"
+              title="Zoomer"
+            >
+              +
+            </button>
+          </div>
         </div>
+        <p className="text-sm text-ink-muted capitalize sm:hidden -mt-2">{rangeLabel}</p>
 
         {error && <p className="text-red-400 text-sm">Erreur : {error}</p>}
 
-        <PlanningGrid dates={dates} eventsByDay={eventsByDay} />
+        <PlanningGrid dates={dates} eventsByDay={eventsByDay} hourHeight={hourHeight} />
       </div>
 
       {toast && <Toast {...toast} onDismiss={() => setToast(null)} />}
