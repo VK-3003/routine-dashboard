@@ -3,7 +3,7 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin, { Draggable } from "@fullcalendar/interaction";
 import { fetchRoutines, reschedule } from "../lib/api.js";
-import { buildEvents, occurrenceDays, jsDayToFrench } from "../lib/weekEvents.js";
+import { buildEvents, occurrenceDays, isWeekRelevant, jsDayToFrench } from "../lib/weekEvents.js";
 import { domaineColor } from "../lib/domaines.js";
 
 function mondayOf(date) {
@@ -49,7 +49,7 @@ export default function WeekView() {
   const weekDates = useMemo(() => weekDatesFrom(weekStart), [weekStart]);
   const events = useMemo(() => buildEvents(routines, weekDates), [routines, weekDates]);
   const backlog = useMemo(
-    () => routines.filter((r) => occurrenceDays(r).length === 0),
+    () => routines.filter((r) => isWeekRelevant(r) && occurrenceDays(r).length === 0),
     [routines]
   );
 

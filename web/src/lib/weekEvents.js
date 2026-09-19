@@ -10,10 +10,23 @@ export function frenchToJsDay(frenchDay) {
   return index === -1 ? null : (index + 1) % 7;
 }
 
+/**
+ * Whether a routine belongs in the Week grid at all. Plain daily routines
+ * with no fixed time apply identically every day - they're already well
+ * served by the Aujourd'hui checklist, and repeating all ~20 of them across
+ * all 7 day columns just floods the all-day row into unreadable mush.
+ * Only routines worth *positioning* (a fixed hour, or a day that varies)
+ * show up here.
+ */
+export function isWeekRelevant(routine) {
+  if (routine.heure) return true;
+  return routine.frequence === "2x/semaine" || routine.frequence === "3x/semaine" || routine.frequence === "Hebdo";
+}
+
 /** Which weekdays a routine occurs on, as French day names. Empty = unplaced (goes to backlog). */
 export function occurrenceDays(routine) {
-  if (routine.frequence === "Quotidien" || !routine.frequence) return [...JOURS_SEMAINE];
-  if (routine.frequence === "Ponctuel") return [];
+  if (routine.heure && (routine.frequence === "Quotidien" || !routine.frequence)) return [...JOURS_SEMAINE];
+  if (!isWeekRelevant(routine)) return [];
   return routine.jours ?? [];
 }
 
