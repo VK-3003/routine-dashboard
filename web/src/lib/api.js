@@ -64,6 +64,10 @@ export function reschedule(routineId, changes) {
   });
 }
 
+export function fetchStats() {
+  return call("/api/stats");
+}
+
 export function checkin(routineId, date, fait) {
   return call("/api/checkin", {
     method: "POST",

@@ -2,10 +2,12 @@ import { useState } from "react";
 import KeyGate from "./components/KeyGate.jsx";
 import TodayView from "./components/TodayView.jsx";
 import WeekView from "./components/WeekView.jsx";
+import StatsView from "./components/StatsView.jsx";
 
 const TABS = [
   { id: "today", label: "Aujourd'hui" },
   { id: "week", label: "Semaine" },
+  { id: "stats", label: "Stats" },
 ];
 
 export default function App() {
@@ -27,7 +29,9 @@ export default function App() {
             </button>
           ))}
         </nav>
-        {tab === "today" ? <TodayView /> : <WeekView />}
+        {tab === "today" && <TodayView />}
+        {tab === "week" && <WeekView />}
+        {tab === "stats" && <StatsView />}
       </div>
     </KeyGate>
   );
