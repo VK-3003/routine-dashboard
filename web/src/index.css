@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@theme {
+  --color-domaine-sport: #f97316;
+  --color-domaine-kine: #ef4444;
+  --color-domaine-skincare: #ec4899;
+  --color-domaine-hygiene: #22c55e;
+  --color-domaine-art: #a855f7;
+  --color-domaine-mental: #3b82f6;
+  --color-domaine-ecrans: #6b7280;
+}
+
+body {
+  background-color: #0f0f12;
+  color: #e5e7eb;
+}

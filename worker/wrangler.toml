@@ -1,0 +1,6 @@
+name = "routine-bot-api"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Secrets (NOTION_TOKEN, API_KEY) are set via `wrangler secret put <NAME>`,
+# never committed here.
