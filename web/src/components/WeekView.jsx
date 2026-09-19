@@ -5,6 +5,7 @@ import interactionPlugin, { Draggable } from "@fullcalendar/interaction";
 import { fetchRoutines, reschedule } from "../lib/api.js";
 import { buildEvents, occurrenceDays, isWeekRelevant, jsDayToFrench } from "../lib/weekEvents.js";
 import { domaineColor } from "../lib/domaines.js";
+import Toast from "./Toast.jsx";
 
 function mondayOf(date) {
   const d = new Date(date);
@@ -26,6 +27,7 @@ export default function WeekView() {
   const [routines, setRoutines] = useState([]);
   const [weekStart, setWeekStart] = useState(mondayOf(new Date()));
   const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
   const backlogRef = useRef(null);
 
   useEffect(() => {
@@ -53,7 +55,8 @@ export default function WeekView() {
     [routines]
   );
 
-  function updateRoutine(routineId, patch) {
+  function applyChange(routineId, patch) {
+    reschedule(routineId, patch).catch((e) => setError(e.message));
     setRoutines((prev) => prev.map((r) => (r.id === routineId ? { ...r, ...patch } : r)));
   }
 
@@ -62,6 +65,7 @@ export default function WeekView() {
     const routine = routines.find((r) => r.id === routineId);
     if (!routine) return;
 
+    const previous = { heure: routine.heure, jours: routine.jours };
     const newDate = info.event.start;
     const newHeure = info.event.allDay
       ? null
@@ -69,8 +73,12 @@ export default function WeekView() {
 
     if (routine.frequence === "Quotidien" || !routine.frequence) {
       // Applies every day - only the time can meaningfully change.
-      reschedule(routineId, { heure: newHeure }).catch((e) => setError(e.message));
-      updateRoutine(routineId, { heure: newHeure });
+      applyChange(routineId, { heure: newHeure });
+      setToast({
+        message: `"${routine.nom}" est quotidienne : seule l'heure a changé, le jour n'a pas d'effet.`,
+        actionLabel: "Annuler",
+        onAction: () => applyChange(routineId, previous),
+      });
       return;
     }
 
@@ -80,8 +88,12 @@ export default function WeekView() {
     const jours = (routine.jours ?? []).filter((d) => d !== oldDay);
     if (!jours.includes(newDay)) jours.push(newDay);
 
-    reschedule(routineId, { jours, heure: newHeure }).catch((e) => setError(e.message));
-    updateRoutine(routineId, { jours, heure: newHeure });
+    applyChange(routineId, { jours, heure: newHeure });
+    setToast({
+      message: `"${routine.nom}" déplacée à ${newDay}.`,
+      actionLabel: "Annuler",
+      onAction: () => applyChange(routineId, previous),
+    });
   }
 
   function handleExternalDrop(info) {
@@ -89,11 +101,16 @@ export default function WeekView() {
     const routine = routines.find((r) => r.id === routineId);
     if (!routine) return;
 
+    const previous = { jours: routine.jours };
     const newDay = jsDayToFrench(info.date.getDay());
     const jours = [...new Set([...(routine.jours ?? []), newDay])];
 
-    reschedule(routineId, { jours }).catch((e) => setError(e.message));
-    updateRoutine(routineId, { jours });
+    applyChange(routineId, { jours });
+    setToast({
+      message: `"${routine.nom}" ajoutée à ${newDay}.`,
+      actionLabel: "Annuler",
+      onAction: () => applyChange(routineId, previous),
+    });
   }
 
   return (
@@ -137,6 +154,8 @@ export default function WeekView() {
           height="auto"
         />
       </div>
+
+      {toast && <Toast {...toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

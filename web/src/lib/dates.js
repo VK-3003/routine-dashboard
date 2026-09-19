@@ -16,7 +16,9 @@ export function todayWeekday() {
 
 export function appliesToday(routine, weekday) {
   if (routine.frequence === "Quotidien" || !routine.frequence) return true;
-  if (routine.frequence === "Ponctuel") return true;
+  // Occasional by definition - not pushed onto a daily checklist. Managed
+  // ad hoc directly in Notion rather than through an automatic touchpoint.
+  if (routine.frequence === "Ponctuel") return false;
   // "2x/semaine", "3x/semaine", "Hebdo": only on assigned days
   return routine.jours?.includes(weekday) ?? false;
 }
