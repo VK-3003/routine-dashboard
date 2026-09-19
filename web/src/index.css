@@ -8,9 +8,35 @@
   --color-domaine-art: #a855f7;
   --color-domaine-mental: #3b82f6;
   --color-domaine-ecrans: #6b7280;
+
+  /* Semantic tokens - overridden under :root.light below. Utilities like
+     bg-surface/text-ink reference these via var(), so the toggle just
+     flips the variable values instead of needing dark:/light: variants
+     sprinkled through every component. */
+  --color-surface: #0f0f12;
+  --color-panel: rgb(255 255 255 / 3%);
+  --color-panel-hover: rgb(255 255 255 / 8%);
+  --color-line: rgb(255 255 255 / 8%);
+  --color-ink: #e5e7eb;
+  --color-ink-muted: rgb(255 255 255 / 50%);
+  --color-ink-faint: rgb(255 255 255 / 40%);
+  --color-chip-active: rgb(255 255 255 / 15%);
+  --color-heatmap-empty: rgb(255 255 255 / 8%);
+}
+
+:root.light {
+  --color-surface: #f7f7f9;
+  --color-panel: #ffffff;
+  --color-panel-hover: #eef0f3;
+  --color-line: #e5e7eb;
+  --color-ink: #16181d;
+  --color-ink-muted: #6b7280;
+  --color-ink-faint: #9aa1ac;
+  --color-chip-active: #16181d1a;
+  --color-heatmap-empty: #e5e7eb;
 }
 
 body {
-  background-color: #0f0f12;
-  color: #e5e7eb;
+  background-color: var(--color-surface);
+  color: var(--color-ink);
 }

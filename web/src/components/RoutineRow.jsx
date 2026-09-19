@@ -2,7 +2,7 @@ import { domaineColor } from "../lib/domaines.js";
 
 export default function RoutineRow({ routine, checked, onToggle }) {
   return (
-    <label className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-white/5 cursor-pointer">
+    <label className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-panel-hover cursor-pointer">
       <input
         type="checkbox"
         checked={checked}
@@ -15,10 +15,10 @@ export default function RoutineRow({ routine, checked, onToggle }) {
         title={routine.domaine ?? ""}
       />
       {routine.heure && (
-        <span className="text-xs text-white/50 tabular-nums w-11 shrink-0">{routine.heure}</span>
+        <span className="text-xs text-ink-muted tabular-nums w-11 shrink-0">{routine.heure}</span>
       )}
-      <span className={checked ? "line-through text-white/40" : "text-white/90"}>{routine.nom}</span>
-      {routine.duree && <span className="ml-auto text-xs text-white/40">{routine.duree} min</span>}
+      <span className={checked ? "line-through text-ink-faint" : "text-ink"}>{routine.nom}</span>
+      {routine.duree && <span className="ml-auto text-xs text-ink-faint">{routine.duree} min</span>}
     </label>
   );
 }

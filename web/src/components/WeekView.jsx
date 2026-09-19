@@ -99,21 +99,21 @@ export default function WeekView() {
   return (
     <div className="flex gap-4 p-4 max-w-6xl mx-auto">
       <aside className="w-56 shrink-0">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-white/40 mb-2">À placer</h2>
+        <h2 className="text-sm font-medium uppercase tracking-wide text-ink-faint mb-2">À placer</h2>
         <div ref={backlogRef} className="space-y-1">
           {backlog.map((routine) => (
             <div
               key={routine.id}
-              className="backlog-item rounded-lg px-2 py-1.5 text-sm cursor-grab bg-white/[0.05] hover:bg-white/10"
+              className="backlog-item rounded-lg px-2 py-1.5 text-sm cursor-grab bg-panel hover:bg-panel-hover text-ink"
               data-id={routine.id}
               data-nom={routine.nom}
               data-color={domaineColor(routine.domaine)}
             >
               {routine.nom}
-              <span className="block text-xs text-white/40">{routine.frequence}</span>
+              <span className="block text-xs text-ink-faint">{routine.frequence}</span>
             </div>
           ))}
-          {backlog.length === 0 && <p className="text-xs text-white/40">Rien à placer.</p>}
+          {backlog.length === 0 && <p className="text-xs text-ink-faint">Rien à placer.</p>}
         </div>
       </aside>
 

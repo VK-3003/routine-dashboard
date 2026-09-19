@@ -14,11 +14,11 @@ function average(values) {
 
 function MetricCard({ label, value, unit }) {
   return (
-    <div className="rounded-xl bg-white/[0.03] px-4 py-3 flex-1">
-      <p className="text-xs text-white/40 uppercase tracking-wide">{label}</p>
-      <p className="text-2xl text-white/90 font-semibold">
+    <div className="rounded-xl bg-panel px-4 py-3 flex-1">
+      <p className="text-xs text-ink-faint uppercase tracking-wide">{label}</p>
+      <p className="text-2xl text-ink font-semibold">
         {value != null ? value.toFixed(1) : "—"}
-        {value != null && <span className="text-sm text-white/40 ml-1">{unit}</span>}
+        {value != null && <span className="text-sm text-ink-faint ml-1">{unit}</span>}
       </p>
     </div>
   );
@@ -29,7 +29,7 @@ function Chip({ active, onClick, children }) {
     <button
       onClick={onClick}
       className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
-        active ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80 bg-white/[0.03]"
+        active ? "bg-chip-active text-ink" : "text-ink-muted hover:text-ink bg-panel"
       }`}
     >
       {children}
@@ -67,7 +67,7 @@ export default function StatsView() {
   }, [data, periodDays]);
 
   if (error) return <p className="text-red-400 p-4">Erreur : {error}</p>;
-  if (!data) return <p className="text-white/50 p-4">Chargement...</p>;
+  if (!data) return <p className="text-ink-muted p-4">Chargement...</p>;
 
   const sommeil = average(metrics.map((m) => m.sommeil));
   const energie = average(metrics.map((m) => m.energie));
@@ -76,7 +76,7 @@ export default function StatsView() {
   return (
     <div className="max-w-xl mx-auto p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-white/90">Stats</h1>
+        <h1 className="text-xl font-semibold text-ink">Stats</h1>
         <div className="flex gap-1">
           {PERIODS.map((p) => (
             <Chip key={p.id} active={periodId === p.id} onClick={() => setPeriodId(p.id)}>
@@ -105,11 +105,11 @@ export default function StatsView() {
         <MetricCard label="Stress moyen" value={stress} unit="/10" />
       </div>
 
-      <div className="rounded-xl bg-white/[0.03] px-4 py-2 divide-y divide-white/5">
+      <div className="rounded-xl bg-panel px-4 py-2 divide-y divide-line">
         {routines.map((routine) => (
           <StatBar key={routine.id} routine={routine} periodDays={periodDays} />
         ))}
-        {routines.length === 0 && <p className="text-white/50 py-4">Rien pour ce filtre.</p>}
+        {routines.length === 0 && <p className="text-ink-muted py-4">Rien pour ce filtre.</p>}
       </div>
     </div>
   );

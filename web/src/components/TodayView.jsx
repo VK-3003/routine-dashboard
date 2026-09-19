@@ -30,7 +30,7 @@ export default function TodayView() {
     checkin(routineId, date, fait).catch((e) => setError(e.message));
   }
 
-  if (loading) return <p className="text-white/50 p-4">Chargement...</p>;
+  if (loading) return <p className="text-ink-muted p-4">Chargement...</p>;
   if (error) return <p className="text-red-400 p-4">Erreur : {error}</p>;
 
   const byMoment = MOMENTS.map((moment) => ({
@@ -42,11 +42,11 @@ export default function TodayView() {
 
   return (
     <div className="max-w-xl mx-auto p-4 space-y-6">
-      <h1 className="text-xl font-semibold text-white/90">Aujourd'hui — {weekday}</h1>
+      <h1 className="text-xl font-semibold text-ink">Aujourd'hui — {weekday}</h1>
       {byMoment.map(({ moment, items }) => (
         <section key={moment}>
-          <h2 className="text-sm font-medium uppercase tracking-wide text-white/40 mb-1">{moment}</h2>
-          <div className="rounded-xl bg-white/[0.03] divide-y divide-white/5">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-ink-faint mb-1">{moment}</h2>
+          <div className="rounded-xl bg-panel divide-y divide-line">
             {items.map((routine) => (
               <RoutineRow
                 key={routine.id}
@@ -58,7 +58,7 @@ export default function TodayView() {
           </div>
         </section>
       ))}
-      {byMoment.length === 0 && <p className="text-white/50">Rien de prévu aujourd'hui.</p>}
+      {byMoment.length === 0 && <p className="text-ink-muted">Rien de prévu aujourd'hui.</p>}
     </div>
   );
 }
