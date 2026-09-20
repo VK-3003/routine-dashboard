@@ -16,8 +16,31 @@ navigateur.
   côté serveur (jamais exposé au navigateur)
 - `electron/` — enveloppe Windows (`.exe`) autour du même `web/`, voir son
   propre README
+- `web/android/` — projet Capacitor/Android natif (générique, généré par
+  `cap add android`), pour produire l'APK
 - `.github/workflows/deploy.yml` — build + déploiement automatique sur
   GitHub Pages à chaque push sur `web/`
+
+## Build de l'APK Android (Capacitor)
+
+Nécessite un JDK 21 et le SDK Android (command-line tools suffisent,
+pas besoin d'installer Android Studio complet) :
+
+```
+cd web
+npm install
+VITE_BASE=./ VITE_WORKER_URL=<url-du-worker> npm run build
+npx cap sync android
+cd android
+# une seule fois : creer local.properties avec `sdk.dir=<chemin-vers-le-sdk>`
+./gradlew assembleDebug
+# APK genere dans android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Build `debug`, non signé — suffisant pour une installation perso
+(active "Sources inconnues" sur le téléphone pour l'installer). Un
+vrai build `release` signé serait nécessaire pour publier sur le Play
+Store, pas notre cas ici.
 
 ## Déploiement du Worker
 
