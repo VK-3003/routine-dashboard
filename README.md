@@ -11,9 +11,11 @@ navigateur.
 
 ## Structure
 
-- `web/` — app React + Vite + Tailwind (vues "Aujourd'hui" et "Semaine")
+- `web/` — app React + Vite + Tailwind (vues "Aujourd'hui", "Semaine", "Stats")
 - `worker/` — Cloudflare Worker, seul point qui détient le token Notion
   côté serveur (jamais exposé au navigateur)
+- `electron/` — enveloppe Windows (`.exe`) autour du même `web/`, voir son
+  propre README
 - `.github/workflows/deploy.yml` — build + déploiement automatique sur
   GitHub Pages à chaque push sur `web/`
 
